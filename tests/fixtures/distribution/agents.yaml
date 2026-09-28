@@ -1,0 +1,9 @@
+schema_version: 1
+name: security-review-kit
+version: 1.0.0
+description: A small local distribution fixture.
+agents:
+  - id: security-auditor
+    source:
+      harness: claude-code
+      path: agents/security-auditor.md
