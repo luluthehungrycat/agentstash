@@ -1,20 +1,27 @@
 ## Context
 
-The `agent-ir` repository has a validated IR and a Claude Code → Codex converter, but users must currently point the conversion CLI at a single profile and manually handle destination paths. This change adds a local distribution manifest and a small installer command without adding remote fetching or another harness adapter.
+The `agent-ir` repository has a validated IR and a Claude Code → Codex converter, but users must currently point the conversion CLI at a single profile and manually handle destination paths. This change adds a versioned distribution manifest and an installer command for local and public GitHub sources. Its implemented conversion path remains Claude Code Markdown → Agent IR → Codex TOML.
+
+The project direction is broader than this slice: AgentStash is intended to support conversions between harnesses through source and target adapters, not to stop at Claude Code and Codex. Future adapters should cover OpenCode, OMP / oh-my-pi, Pi (using an extension if necessary), Mistral Vibe CLI, Hermes Agent, and Claude Code target/round-trip behavior. OpenClaw is a possible later addition. Antigravity and Copilot CLI require capability discovery before deciding whether they can be supported.
+
+Adapters own semantic mappings and diagnostics. If a target lacks a source primitive, an adapter may select another target control only when it safely preserves or narrows effective authority. It should report omitted functionality; if the adapter cannot establish a safe capability subset, it must block runnable output. Additional harnesses require verification against real harness behavior before they are treated as supported.
 
 The Codex renderer accepts a `CodexTargetContext` describing the effective runtime boundary. The installer must pass this context through unchanged and must never treat missing or broader authority as a functionality-only warning.
 
 ## Goals / Non-Goals
 
 **Goals:**
-- Make a local directory a validated, named distribution containing selectable agent profiles.
+- Make a local directory or public GitHub repository a validated, named distribution containing selectable agent profiles.
 - List and inspect agents without writing files.
 - Install a selected agent as Codex TOML into an explicit project or user scope, reusing the current parser, IR, renderer, and diagnostics.
 - Offer a preview path, refuse unsafe conversion, and avoid overwriting an existing target by default.
 
-**Non-Goals:**
-- Fetching GitHub or other remote sources, package publishing, or version-update/lockfile management.
-- Installing to harnesses other than Codex or parsing source formats other than Claude Code Markdown.
+**Implementation-slice boundaries (not product non-goals):**
+- This slice implements Claude Code Markdown as a source and Codex TOML as a target; it does not implement the additional adapters or same-harness round trips listed above.
+- Other Git hosts, private GitHub repositories, and version-update/lockfile management are not included in this slice.
+- The release workflow is prepared, but creating a release and publishing a package are separate operations.
+
+**Other Non-Goals:**
 - Installing Codex profiles or changing global Codex configuration. The installer writes only the selected standalone agent file.
 - Trusting the distribution's declarations as proof of target runtime enforcement.
 
@@ -26,9 +33,9 @@ Use `agents.yaml` at the distribution root. A strict Pydantic v2 model validates
 
 An explicit manifest is preferred over recursively treating every Markdown file as an agent: repositories contain READMEs and other Markdown, and installs need stable identities. Future distributions may add more harness-specific source definitions while retaining the manifest versioning boundary.
 
-### CLI is local-first and separates read-only commands from writes
+### CLI separates read-only commands from writes
 
-Expose an `agents` console command alongside the existing `agent-ir` command:
+Expose the primary `agentstash` console command alongside the existing `agent-ir` command; retain `agents` as a compatibility alias:
 
 - `agents list <distribution>` validates the manifest and lists stable IDs/names.
 - `agents inspect <distribution> <id>` parses the source and reports its identity, source harness, and semantic capability summary without writing.
@@ -43,9 +50,9 @@ The Codex context file is JSON produced from the existing `CodexTargetContext` m
 - `--scope` is required. Do not infer scope from the source or current path.
 - Create parent directories only during a real install. Write via a temporary file in the destination directory and atomically replace it. Existing targets fail unless `--force` is supplied.
 
-### Keep distribution reading inert
+### Treat distribution content as data
 
-Read only the manifest and the selected source file. Do not execute distribution code, import Python modules from a distribution, load MCP servers, install dependencies, or access the network. Resolve every manifest path and verify it remains beneath the distribution root before reading.
+Read only the manifest and selected source file. Do not execute distribution code, import Python modules from a distribution, load MCP servers, or install dependencies. Resolve every manifest path and verify it remains beneath the distribution root before reading. Local distribution operations do not access the network. Public GitHub sources use bounded HTTPS requests to resolve refs and download archives; validate archive paths and entry types before exposing cached files to the manifest reader.
 
 ## Risks / Trade-offs
 
@@ -60,5 +67,6 @@ No existing config or installed files are migrated. Add the console script and m
 
 ## Open Questions
 
-- Remote source resolution and immutable commit pinning are deferred to a later change.
-- A later naming decision selected `agentstash` as the distribution and primary CLI command so `uvx agentstash` can use matching package and entry-point names. The `agents` command remains a compatibility alias; PyPI publishing remains deferred.
+- Future harness adapters need verified mappings for each harness's tools, permissions, model controls, delegation, isolation, and lifecycle semantics.
+- Antigravity and Copilot CLI first need research into whether they expose custom-agent or subagent definitions.
+- The package and primary CLI are named `agentstash`; `agents` and `agent-ir` remain available for compatibility. The release workflow uses PyPI Trusted Publishing, but the first package release has not been published.

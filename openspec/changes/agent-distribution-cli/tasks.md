@@ -15,4 +15,4 @@
 
 - [x] 3.1 Add CLI tests for list, inspect, safe install, blocked conversion, dry-run, conflicts, force replacement, and inert distribution handling.
 - [x] 3.2 Run the full test suite, type checks, compilation checks, and OpenSpec validation; fix regressions.
-- [x] 3.3 Document the manifest and local install workflow, operator context limits, and deferred remote/publishing work.
+- [x] 3.3 Document distribution and install workflows, operator context limits, current adapter scope, and future harness-conversion direction.
