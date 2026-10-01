@@ -14,25 +14,26 @@ from pydantic import ValidationError
 
 from agent_ir.adapters.codex import CodexAdapter
 from agent_ir.distribution import LocalDistribution
+from agent_ir.github_distributions import RemoteSourceInfo, resolve_github_distribution
 from agent_ir.models import CodexTargetContext
 from agent_ir.registry import SOURCES
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="agents")
+    parser = argparse.ArgumentParser(prog="agentstash")
     commands = parser.add_subparsers(dest="command", required=True)
 
     list_command = commands.add_parser("list", help="list agents in a local distribution")
-    list_command.add_argument("distribution", type=Path)
+    list_command.add_argument("distribution")
     list_command.set_defaults(handler=_list)
 
     inspect = commands.add_parser("inspect", help="inspect an agent without installing it")
-    inspect.add_argument("distribution", type=Path)
+    inspect.add_argument("distribution")
     inspect.add_argument("agent_id")
     inspect.set_defaults(handler=_inspect)
 
     add = commands.add_parser("add", help="convert and install an agent locally")
-    add.add_argument("distribution", type=Path)
+    add.add_argument("distribution")
     add.add_argument("agent_id")
     add.add_argument("--to", choices=["codex"], required=True)
     add.add_argument("--scope", choices=["project", "user"], required=True)
@@ -44,16 +45,25 @@ def _parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _load_profile(distribution_path: Path, agent_id: str):
-    distribution = LocalDistribution.load(distribution_path)
+def _load_profile(distribution_path: str, agent_id: str):
+    distribution, remote_source = _resolve_distribution(distribution_path)
     item = distribution.get_agent(agent_id)
     parsed = SOURCES[item.source.harness].parse(distribution.read_source(item))
-    return distribution, item, parsed
+    return distribution, item, parsed, remote_source
+
+
+def _resolve_distribution(locator: str) -> tuple[LocalDistribution, RemoteSourceInfo | None]:
+    if locator.startswith("github:"):
+        resolved = resolve_github_distribution(locator)
+        return resolved.distribution, resolved.source
+    if "://" in locator or locator.startswith("git@"):
+        raise ValueError("only public GitHub distribution locators are supported for remote sources")
+    return LocalDistribution.load(Path(locator).expanduser()), None
 
 
 def _list(args: argparse.Namespace) -> int:
     try:
-        distribution = LocalDistribution.load(args.distribution)
+        distribution, remote_source = _resolve_distribution(args.distribution)
         distribution.validate_sources()
         entries = [
             {
@@ -65,13 +75,20 @@ def _list(args: argparse.Namespace) -> int:
         ]
     except (OSError, ValueError, ValidationError) as exc:
         return _error(exc)
-    _print({"distribution": distribution.manifest.name, "version": distribution.manifest.version, "agents": entries})
+    report: dict[str, object] = {
+        "distribution": distribution.manifest.name,
+        "version": distribution.manifest.version,
+        "agents": entries,
+    }
+    if remote_source is not None:
+        report["remote_source"] = remote_source.as_json()
+    _print(report)
     return 0
 
 
 def _inspect(args: argparse.Namespace) -> int:
     try:
-        distribution, item, parsed = _load_profile(args.distribution, args.agent_id)
+        distribution, item, parsed, remote_source = _load_profile(args.distribution, args.agent_id)
     except (OSError, ValueError, ValidationError) as exc:
         return _error(exc)
     agent = parsed.agent
@@ -98,13 +115,15 @@ def _inspect(args: argparse.Namespace) -> int:
         },
         "diagnostics": [diagnostic.model_dump(mode="json") for diagnostic in parsed.diagnostics],
     }
+    if remote_source is not None:
+        report["remote_source"] = remote_source.as_json()
     _print(report)
     return 0
 
 
 def _add(args: argparse.Namespace) -> int:
     try:
-        distribution, item, parsed = _load_profile(args.distribution, args.agent_id)
+        distribution, item, parsed, remote_source = _load_profile(args.distribution, args.agent_id)
         context_text = args.codex_context.read_text(encoding="utf-8")
         context = CodexTargetContext.model_validate_json(context_text)
         result = CodexAdapter().render(parsed.agent, context)
@@ -126,6 +145,8 @@ def _add(args: argparse.Namespace) -> int:
         "dry_run": args.dry_run,
         "diagnostics": diagnostics,
     }
+    if remote_source is not None:
+        report["remote_source"] = remote_source.as_json()
     if not result.emitted:
         _print(report)
         return 2

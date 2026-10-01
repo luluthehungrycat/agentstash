@@ -3,9 +3,9 @@ requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agent-ir"
+name = "agentstash"
 version = "0.1.0"
-description = "Internal intermediate representation and adapters for portable custom agents"
+description = "Agent distribution CLI and internal intermediate representation for portable custom agents"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -19,6 +19,7 @@ dev = ["pytest>=8,<9", "mypy>=1.13,<2", "types-PyYAML>=6.0.12,<7"]
 
 [project.scripts]
 agent-ir = "agent_ir.cli:main"
+agentstash = "agent_ir.agents_cli:main"
 agents = "agent_ir.agents_cli:main"
 
 [tool.hatch.build.targets.wheel]

@@ -61,4 +61,4 @@ No existing config or installed files are migrated. Add the console script and m
 ## Open Questions
 
 - Remote source resolution and immutable commit pinning are deferred to a later change.
-- Package naming/publishing for a direct `uvx agents` invocation is deferred; this slice exposes the `agents` executable locally and keeps the existing `agent-ir` distribution name.
+- A later naming decision selected `agentstash` as the distribution and primary CLI command so `uvx agentstash` can use matching package and entry-point names. The `agents` command remains a compatibility alias; PyPI publishing remains deferred.

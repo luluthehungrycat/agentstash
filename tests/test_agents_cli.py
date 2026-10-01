@@ -3,6 +3,8 @@ from pathlib import Path
 import tomllib
 
 from agent_ir.agents_cli import main
+from agent_ir.distribution import LocalDistribution
+from agent_ir.github_distributions import RemoteSourceInfo, ResolvedRemoteDistribution
 
 FIXTURE = Path(__file__).parent / "fixtures" / "distribution"
 CONTEXT = {
@@ -17,6 +19,18 @@ CONTEXT = {
     "delegation": "none",
     "workspace_scope": "workspace",
 }
+
+
+def test_pyproject_exposes_agentstash_and_compatibility_commands() -> None:
+    project_file = Path(__file__).parents[1] / "pyproject.toml"
+    project = tomllib.loads(project_file.read_text(encoding="utf-8"))
+
+    assert project["project"]["name"] == "agentstash"
+    assert project["project"]["scripts"] == {
+        "agent-ir": "agent_ir.cli:main",
+        "agentstash": "agent_ir.agents_cli:main",
+        "agents": "agent_ir.agents_cli:main",
+    }
 
 
 def _context(tmp_path: Path, value: dict[str, object] | None = None) -> Path:
@@ -131,3 +145,77 @@ def test_distribution_neighbor_code_is_never_executed(tmp_path: Path, monkeypatc
 
     assert main() == 0
     assert not (tmp_path / "marker").exists()
+
+
+def test_remote_cli_reports_resolved_pin_and_uses_existing_codex_gate(monkeypatch, capsys, tmp_path: Path) -> None:
+    resolved = ResolvedRemoteDistribution(
+        distribution=LocalDistribution.load(FIXTURE),
+        source=RemoteSourceInfo(
+            owner="example",
+            repository="agents",
+            requested_ref="main",
+            commit_sha="0123456789abcdef0123456789abcdef01234567",
+            cache_hit=True,
+        ),
+    )
+    monkeypatch.setattr("agent_ir.agents_cli.resolve_github_distribution", lambda locator: resolved)
+    locator = "github:example/agents@main"
+    monkeypatch.setattr("sys.argv", ["agents", "list", locator])
+
+    assert main() == 0
+    listing = json.loads(capsys.readouterr().out)
+    assert listing["remote_source"]["commit_sha"] == resolved.source.commit_sha
+    assert listing["remote_source"]["cache_hit"]
+
+    monkeypatch.setattr("sys.argv", ["agents", "inspect", locator, "security-auditor"])
+    assert main() == 0
+    inspected = json.loads(capsys.readouterr().out)
+    assert inspected["remote_source"]["commit_sha"] == resolved.source.commit_sha
+
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["agents", "add", locator, "security-auditor", "--to", "codex", "--scope", "project",
+         "--project-root", str(project), "--codex-context", str(_context(tmp_path)), "--dry-run"],
+    )
+    assert main() == 0
+    preview = json.loads(capsys.readouterr().out)
+    assert preview["remote_source"]["requested_ref"] == "main"
+    assert preview["emitted"]
+    assert not (project / ".codex").exists()
+
+
+def test_remote_cli_rejects_non_github_url(monkeypatch, capsys) -> None:
+    monkeypatch.setattr("sys.argv", ["agents", "list", "https://example.invalid/agents"])
+
+    assert main() == 2
+    assert "only public GitHub" in capsys.readouterr().err
+
+
+def test_remote_add_cannot_bypass_codex_authority_gate(monkeypatch, capsys, tmp_path: Path) -> None:
+    resolved = ResolvedRemoteDistribution(
+        distribution=LocalDistribution.load(FIXTURE),
+        source=RemoteSourceInfo(
+            owner="example",
+            repository="agents",
+            requested_ref="main",
+            commit_sha="0123456789abcdef0123456789abcdef01234567",
+            cache_hit=True,
+        ),
+    )
+    monkeypatch.setattr("agent_ir.agents_cli.resolve_github_distribution", lambda locator: resolved)
+    project = tmp_path / "project"
+    project.mkdir()
+    unsafe_context = dict(CONTEXT, enforced_capabilities=[*CONTEXT["enforced_capabilities"], "shell.execute"])
+    monkeypatch.setattr(
+        "sys.argv",
+        ["agents", "add", "github:example/agents@main", "security-auditor", "--to", "codex", "--scope", "project",
+         "--project-root", str(project), "--codex-context", str(_context(tmp_path, unsafe_context))],
+    )
+
+    assert main() == 2
+    report = json.loads(capsys.readouterr().out)
+    assert not report["emitted"]
+    assert report["remote_source"]["commit_sha"] == resolved.source.commit_sha
+    assert not (project / ".codex").exists()
