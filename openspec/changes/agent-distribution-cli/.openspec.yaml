@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-09-26
+goal: Make portable agent distributions usable from local repositories through
+  safe preview and install workflows
