@@ -59,3 +59,22 @@ def test_rejects_symlink_that_escapes_distribution_root(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="escapes distribution root"):
         distribution.read_source(distribution.get_agent("x"))
+
+
+def test_requires_open_code_relative_identity_and_forbids_explicit_null_on_claude(tmp_path: Path) -> None:
+    manifest = tmp_path / "agents.yaml"
+    manifest.write_text(
+        "schema_version: 1\nname: kit\nversion: '1'\nagents:\n"
+        "  - id: x\n    source: {harness: opencode-v2, path: agents/a.md}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="require `agent_relative_path`"):
+        LocalDistribution.load(tmp_path)
+
+    manifest.write_text(
+        "schema_version: 1\nname: kit\nversion: '1'\nagents:\n"
+        "  - id: x\n    source: {harness: claude-code, path: a.md, agent_relative_path: null}\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(ValueError, match="only valid for OpenCode"):
+        LocalDistribution.load(tmp_path)

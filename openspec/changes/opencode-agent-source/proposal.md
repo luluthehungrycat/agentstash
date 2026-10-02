@@ -8,7 +8,7 @@ AgentStash currently reads Claude Code Markdown distributions and converts them 
 - Parse Markdown frontmatter and body into Agent IR while retaining the original document, all frontmatter, ordered permission rules, and unsupported fields.
 - Derive the OpenCode agent ID from an explicit `source.agent_relative_path` relative to an OpenCode agents directory, separate from the contained distribution `source.path`. Preserve nested IDs and fail when identity context is absent or invalid.
 - Support inspection without claiming that source-local permissions describe the effective OpenCode policy.
-- Convert through the existing Codex renderer only when the source permission boundary and Codex target context prove a safe subset. Require `--opencode-context` when agent-local rules do not prove the source ceiling; report supplied declarations as unverified and block unknown, broader, or unrepresentable authority.
+- Convert through the existing Codex renderer only when the source permission boundary and Codex target context prove a safe subset. Require `--opencode-context` when agent-local rules do not prove the source ceiling; report supplied declarations as unverified and block unknown, broader, or unrepresentable authority. Require explicit equal source and target workspace scopes for path-scoped access, and provide `--codex-no-capabilities` to state an empty standalone target boundary.
 - Keep OpenCode V1, JSONC agent definitions, OpenCode as a target, migration, and lifecycle hooks outside this change.
 
 ## Capabilities

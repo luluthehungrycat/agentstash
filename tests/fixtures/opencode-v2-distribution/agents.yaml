@@ -1,0 +1,9 @@
+schema_version: 1
+name: opencode-source-fixture
+version: 1.0.0
+agents:
+  - id: read-only-reviewer
+    source:
+      harness: opencode-v2
+      path: agents/reviewer.md
+      agent_relative_path: reviewer.md

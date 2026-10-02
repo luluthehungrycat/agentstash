@@ -7,6 +7,7 @@ from agent_ir.distribution import LocalDistribution
 from agent_ir.github_distributions import RemoteSourceInfo, ResolvedRemoteDistribution
 
 FIXTURE = Path(__file__).parent / "fixtures" / "distribution"
+OPENCODE_FIXTURE = Path(__file__).parent / "fixtures" / "opencode-v2-distribution"
 CONTEXT = {
     "enforced_capabilities": [
         "filesystem.read_content",
@@ -218,4 +219,160 @@ def test_remote_add_cannot_bypass_codex_authority_gate(monkeypatch, capsys, tmp_
     report = json.loads(capsys.readouterr().out)
     assert not report["emitted"]
     assert report["remote_source"]["commit_sha"] == resolved.source.commit_sha
+    assert not (project / ".codex").exists()
+
+
+def test_opencode_list_inspect_and_add_keep_path_identity_separate(monkeypatch, capsys, tmp_path: Path) -> None:
+    monkeypatch.setattr("sys.argv", ["agentstash", "list", str(OPENCODE_FIXTURE)])
+    assert main() == 0
+    listing = json.loads(capsys.readouterr().out)
+    assert listing["agents"][0]["path"] == "agents/reviewer.md"
+    assert listing["agents"][0]["agent_relative_path"] == "reviewer.md"
+
+    monkeypatch.setattr("sys.argv", ["agentstash", "inspect", str(OPENCODE_FIXTURE), "read-only-reviewer"])
+    assert main() == 0
+    inspected = json.loads(capsys.readouterr().out)
+    assert inspected["agent"]["name"] == "reviewer"
+    assert inspected["opencode"]["effective_authority"] == "unknown or inherited"
+
+    project = tmp_path / "project"
+    project.mkdir()
+    codex_context = _context(tmp_path)
+    opencode_context = tmp_path / "opencode-context.json"
+    opencode_context.write_text(json.dumps({"effective_capabilities": {
+        "tools": [
+            {"name": "read", "state": "allowed", "semantic_capabilities": ["filesystem.read_content"]},
+            {"name": "glob", "state": "allowed", "semantic_capabilities": ["filesystem.list_paths"]},
+            {"name": "grep", "state": "allowed", "semantic_capabilities": ["filesystem.search_content"]},
+        ],
+        "tool_policy_mode": "allowlist", "filesystem": "read-only", "shell": "none",
+        "network": "none", "delegation": "none", "workspace_scope": "workspace",
+    }}), encoding="utf-8")
+    argv = [
+        "agentstash", "add", str(OPENCODE_FIXTURE), "read-only-reviewer", "--to", "codex", "--scope", "project",
+        "--project-root", str(project), "--codex-context", str(codex_context),
+        "--opencode-context", str(opencode_context), "--dry-run",
+    ]
+    monkeypatch.setattr("sys.argv", argv)
+    assert main() == 0
+    preview = json.loads(capsys.readouterr().out)
+    assert preview["emitted"]
+    assert preview["source"]["agent_relative_path"] == "reviewer.md"
+    assert not (project / ".codex").exists()
+
+    monkeypatch.setattr("sys.argv", argv[:-1])
+    assert main() == 0
+    installed = json.loads(capsys.readouterr().out)
+    assert installed["installed"]
+    assert Path(installed["destination"]).exists()
+
+
+def test_nested_opencode_identity_refuses_install_without_flattening(tmp_path: Path, monkeypatch, capsys) -> None:
+    import shutil
+
+    distribution_path = tmp_path / "nested-distribution"
+    shutil.copytree(OPENCODE_FIXTURE, distribution_path)
+    manifest_path = distribution_path / "agents.yaml"
+    manifest_path.write_text(
+        manifest_path.read_text(encoding="utf-8").replace("agent_relative_path: reviewer.md", "agent_relative_path: team/reviewer.md"),
+        encoding="utf-8",
+    )
+    project = tmp_path / "project"
+    project.mkdir()
+    monkeypatch.setattr(
+        "sys.argv",
+        ["agentstash", "add", str(distribution_path), "read-only-reviewer", "--to", "codex", "--scope", "project",
+         "--project-root", str(project), "--codex-context", str(_context(tmp_path, {
+             "enforced_capabilities": [], "filesystem": "none", "shell": "none",
+             "network": "none", "delegation": "none", "workspace_scope": None,
+         }))],
+    )
+
+    assert main() == 2
+    assert "destination filename" in capsys.readouterr().err
+    assert not (project / ".codex").exists()
+
+
+def test_opencode_missing_context_blocks_add_without_destination(tmp_path: Path, monkeypatch, capsys) -> None:
+    import shutil
+
+    distribution_path = tmp_path / "missing-context-distribution"
+    shutil.copytree(OPENCODE_FIXTURE, distribution_path)
+    (distribution_path / "agents" / "reviewer.md").write_text(
+        "---\nmode: subagent\ndescription: inherits ambient policy\n---\nDo work.\n",
+        encoding="utf-8",
+    )
+    project = tmp_path / "project"
+    project.mkdir()
+    codex_context = _context(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["agentstash", "add", str(distribution_path), "read-only-reviewer", "--to", "codex", "--scope", "project",
+         "--project-root", str(project), "--codex-context", str(codex_context)],
+    )
+
+    assert main() == 2
+    report = json.loads(capsys.readouterr().out)
+    assert not report["emitted"]
+    assert report["opencode_source_boundary_input"] == "unknown"
+    assert not (project / ".codex").exists()
+
+
+def test_remote_opencode_inspect_and_add_keep_path_identity(monkeypatch, capsys, tmp_path: Path) -> None:
+    resolved = ResolvedRemoteDistribution(
+        distribution=LocalDistribution.load(OPENCODE_FIXTURE),
+        source=RemoteSourceInfo(
+            owner="example", repository="opencode-agents", requested_ref="main",
+            commit_sha="0123456789abcdef0123456789abcdef01234567", cache_hit=True,
+        ),
+    )
+    monkeypatch.setattr("agent_ir.agents_cli.resolve_github_distribution", lambda locator: resolved)
+    locator = "github:example/opencode-agents@main"
+    monkeypatch.setattr("sys.argv", ["agentstash", "list", locator])
+    assert main() == 0
+    listing = json.loads(capsys.readouterr().out)
+    assert listing["agents"][0]["agent_relative_path"] == "reviewer.md"
+    assert listing["remote_source"]["commit_sha"] == resolved.source.commit_sha
+
+    monkeypatch.setattr("sys.argv", ["agentstash", "inspect", locator, "read-only-reviewer"])
+    assert main() == 0
+    inspected = json.loads(capsys.readouterr().out)
+    assert inspected["source"]["agent_relative_path"] == "reviewer.md"
+    assert inspected["remote_source"]["commit_sha"] == resolved.source.commit_sha
+
+    project = tmp_path / "project"
+    project.mkdir()
+    codex_context = _context(tmp_path)
+    opencode_context = tmp_path / "remote-opencode-context.json"
+    opencode_context.write_text(json.dumps({"effective_capabilities": {
+        "tools": [
+            {"name": "read", "state": "allowed", "semantic_capabilities": ["filesystem.read_content"]},
+            {"name": "glob", "state": "allowed", "semantic_capabilities": ["filesystem.list_paths"]},
+            {"name": "grep", "state": "allowed", "semantic_capabilities": ["filesystem.search_content"]},
+        ],
+        "tool_policy_mode": "allowlist", "filesystem": "read-only", "shell": "none",
+        "network": "none", "delegation": "none", "workspace_scope": "workspace",
+    }}), encoding="utf-8")
+    monkeypatch.setattr(
+        "sys.argv",
+        ["agentstash", "add", locator, "read-only-reviewer", "--to", "codex", "--scope", "project",
+         "--project-root", str(project), "--codex-context", str(codex_context),
+         "--opencode-context", str(opencode_context), "--dry-run"],
+    )
+    assert main() == 0
+    preview = json.loads(capsys.readouterr().out)
+    assert preview["emitted"]
+    assert preview["source"]["agent_relative_path"] == "reviewer.md"
+    assert preview["remote_source"]["commit_sha"] == resolved.source.commit_sha
+    assert not (project / ".codex").exists()
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["agentstash", "add", locator, "read-only-reviewer", "--to", "codex", "--scope", "project",
+         "--project-root", str(project), "--codex-context", str(codex_context)],
+    )
+    assert main() == 2
+    blocked = json.loads(capsys.readouterr().out)
+    assert not blocked["emitted"]
+    assert blocked["remote_source"]["commit_sha"] == resolved.source.commit_sha
     assert not (project / ".codex").exists()

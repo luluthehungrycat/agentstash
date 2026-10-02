@@ -158,8 +158,8 @@ class CodexAdapter:
                 ))
 
         doc = tomlkit.document()
-        doc.add("name", agent.name)
-        doc.add("description", agent.description)
+        doc.add("name", tomlkit.string(agent.name))
+        doc.add("description", tomlkit.string(agent.description))
         if source_allowed is not None and agent.capabilities.tool_policy_mode == ToolPolicyMode.ALLOWLIST:
             disabled_features = tomlkit.table()
             if "shell.execute" not in source_allowed:
@@ -175,7 +175,7 @@ class CodexAdapter:
             if disabled_features:
                 doc.add("features", disabled_features)
             if "network.search" not in source_allowed:
-                doc.add("web_search", "disabled")
+                doc.add("web_search", tomlkit.string("disabled"))
                 diagnostics.append(ConversionDiagnostic(
                     code="codex.web_search_disabled_per_agent",
                     field_path="capabilities.tools",
@@ -204,9 +204,9 @@ class CodexAdapter:
                 message="The source inherits its caller's model; the Codex agent omits a model override and uses the Codex caller/default model.",
             ))
         if context.filesystem == FilesystemAccess.READ_ONLY:
-            doc.add("sandbox_mode", "read-only")
+            doc.add("sandbox_mode", tomlkit.string("read-only"))
         elif context.filesystem == FilesystemAccess.WORKSPACE_WRITE:
-            doc.add("sandbox_mode", "workspace-write")
+            doc.add("sandbox_mode", tomlkit.string("workspace-write"))
         elif context.filesystem == FilesystemAccess.FULL:
             diagnostics.append(_authority_block(
                 "codex.full_filesystem_not_renderable",
@@ -215,7 +215,7 @@ class CodexAdapter:
             ))
             return ConversionResult(agent=agent, diagnostics=diagnostics)
 
-        doc.add("developer_instructions", agent.instructions)
+        doc.add("developer_instructions", tomlkit.string(agent.instructions))
         text = tomlkit.dumps(doc)
         # Parse our own output to ensure TOML serialization is valid before emission.
         tomlkit.parse(text)
