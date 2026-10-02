@@ -171,6 +171,7 @@ def test_extracts_valid_archive_and_rejects_unsafe_entries(tmp_path: Path) -> No
         _archive([("hardlink", b"repo-root/reviewer.md", "hardlink")]),
         _archive([("same", b"one", "file"), ("same", b"two", "file")]),
         _archive([("nested/child", b"one", "file"), ("nested", b"not-a-dir", "file")]),
+        _archive([("nested", b"not-a-dir", "file"), ("nested/child", b"one", "file")]),
         _archive([], second_root=True),
         _archive([("CON.txt", b"device", "file")]),
     ]
@@ -179,6 +180,37 @@ def test_extracts_valid_archive_and_rejects_unsafe_entries(tmp_path: Path) -> No
         destination.mkdir()
         with pytest.raises(ValueError):
             github._extract_archive(contents, destination)
+
+
+def test_archive_path_registration_does_not_scan_prior_entries() -> None:
+    class NonIterableEntries(dict[Path, str]):
+        def __iter__(self):
+            raise AssertionError("archive validation must not scan prior entries")
+
+        def items(self):
+            raise AssertionError("archive validation must not scan prior entries")
+
+        def keys(self):
+            raise AssertionError("archive validation must not scan prior entries")
+
+        def values(self):
+            raise AssertionError("archive validation must not scan prior entries")
+
+    entries: dict[Path, str] = NonIterableEntries()
+    file_paths: set[Path] = set()
+    paths_with_descendants: set[Path] = set()
+    for index in range(2_000):
+        path = Path("agents") / f"profile-{index}.md"
+        github._register_archive_path(
+            path,
+            "file",
+            path.as_posix(),
+            entries,
+            file_paths,
+            paths_with_descendants,
+        )
+
+    assert len(entries) == 2_000
 
 
 def test_extract_rejects_size_limits(tmp_path: Path, monkeypatch) -> None:

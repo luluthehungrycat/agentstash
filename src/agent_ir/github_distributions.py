@@ -295,6 +295,8 @@ def _extract_archive(archive: bytes, destination: Path) -> None:
             with tarfile.open(fileobj=cast(BinaryIO, bounded), mode="r|") as tar:
                 root_name: str | None = None
                 entries: dict[Path, str] = {}
+                file_paths: set[Path] = set()
+                paths_with_descendants: set[Path] = set()
                 total_size = 0
                 entry_count = 0
                 base = destination.resolve(strict=True)
@@ -333,14 +335,14 @@ def _extract_archive(archive: bytes, destination: Path) -> None:
                     else:
                         raise ValueError(f"GitHub archive contains an unsupported link or special entry: {raw_name!r}")
 
-                    if relative in entries:
-                        raise ValueError(f"GitHub archive contains a duplicate path: {raw_name!r}")
-                    if kind == "file" and any(relative in previous.parents for previous in entries):
-                        raise ValueError("GitHub archive has a file used as a parent directory")
-                    for parent in relative.parents:
-                        if entries.get(parent) == "file":
-                            raise ValueError("GitHub archive has a file used as a parent directory")
-                    entries[relative] = kind
+                    _register_archive_path(
+                        relative,
+                        kind,
+                        raw_name,
+                        entries,
+                        file_paths,
+                        paths_with_descendants,
+                    )
 
                     if relative == Path():
                         continue
@@ -369,6 +371,27 @@ def _extract_archive(archive: bytes, destination: Path) -> None:
                     raise ValueError("GitHub archive is empty")
     except (tarfile.TarError, OSError, EOFError, zlib.error) as exc:
         raise ValueError(f"GitHub returned an invalid or truncated tar.gz archive: {exc}") from exc
+
+
+def _register_archive_path(
+    relative: Path,
+    kind: str,
+    raw_name: str,
+    entries: dict[Path, str],
+    file_paths: set[Path],
+    paths_with_descendants: set[Path],
+) -> None:
+    if relative in entries:
+        raise ValueError(f"GitHub archive contains a duplicate path: {raw_name!r}")
+    if kind == "file" and relative in paths_with_descendants:
+        raise ValueError("GitHub archive has a file used as a parent directory")
+    for parent in relative.parents:
+        if parent in file_paths:
+            raise ValueError("GitHub archive has a file used as a parent directory")
+        paths_with_descendants.add(parent)
+    entries[relative] = kind
+    if kind == "file":
+        file_paths.add(relative)
 
 
 def _unsafe_windows_component(component: str) -> bool:
