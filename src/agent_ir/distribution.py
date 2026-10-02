@@ -10,6 +10,7 @@ import yaml
 
 from pydantic import Field, ValidationError, field_validator, model_validator
 
+from agent_ir.adapters.base import validate_agent_relative_path
 from agent_ir.models import StrictModel
 
 
@@ -55,13 +56,24 @@ _UniqueKeyLoader.add_constructor(
 class AgentSource(StrictModel):
     harness: str
     path: str = Field(min_length=1)
+    agent_relative_path: str | None = None
 
     @field_validator("harness")
     @classmethod
     def supported_harness(cls, value: str) -> str:
-        if value != "claude-code":
-            raise ValueError("this distribution version supports only `claude-code` sources")
+        if value not in {"claude-code", "opencode-v2"}:
+            raise ValueError("this distribution version supports only `claude-code` and `opencode-v2` sources")
         return value
+
+    @model_validator(mode="after")
+    def validate_agent_relative_path(self) -> "AgentSource":
+        if self.harness == "opencode-v2":
+            if self.agent_relative_path is None:
+                raise ValueError("OpenCode V2 sources require `agent_relative_path`")
+            validate_agent_relative_path(self.agent_relative_path)
+        elif "agent_relative_path" in self.model_fields_set:
+            raise ValueError("`agent_relative_path` is only valid for OpenCode V2 sources")
+        return self
 
 
 class DistributionAgent(StrictModel):
@@ -139,7 +151,7 @@ class LocalDistribution:
         if relative.is_absolute() or ".." in relative.parts:
             raise ValueError(f"source path must be relative and cannot traverse parents: {agent.source.path}")
         if relative.suffix.lower() != ".md":
-            raise ValueError(f"Claude Code source must be a Markdown file: {agent.source.path}")
+            raise ValueError(f"agent source must be a Markdown file: {agent.source.path}")
         try:
             source_path = (self.root / relative).resolve(strict=True)
         except OSError as exc:

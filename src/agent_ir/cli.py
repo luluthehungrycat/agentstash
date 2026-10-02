@@ -19,7 +19,7 @@ from agent_ir.models import (
     NetworkAccess,
     ShellAccess,
 )
-from agent_ir.registry import SOURCES
+from agent_ir.registry import SOURCES, apply_source_context, parse_source, validate_source_target_scope
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -27,9 +27,18 @@ def _parser() -> argparse.ArgumentParser:
     commands = parser.add_subparsers(dest="command", required=True)
     schema = commands.add_parser("schema", help="print the Agent IR JSON Schema")
     schema.set_defaults(handler=_schema)
-    convert = commands.add_parser("convert", help="convert Claude Code Markdown to Codex TOML")
+    convert = commands.add_parser("convert", help="convert supported agent Markdown to Codex TOML")
     convert.add_argument("source", type=Path)
     convert.add_argument("--from", dest="source_harness", choices=sorted(SOURCES), default="claude-code")
+    convert.add_argument(
+        "--source-agent-path",
+        help="OpenCode agent path relative to an agents directory, such as team/reviewer.md",
+    )
+    convert.add_argument(
+        "--opencode-context",
+        type=Path,
+        help="operator-declared OpenCode effective_capabilities JSON when agent rules do not prove a ceiling",
+    )
     convert.add_argument("--to", dest="target_harness", choices=["codex"], default="codex")
     convert.add_argument(
         "--codex-capability",
@@ -37,10 +46,19 @@ def _parser() -> argparse.ArgumentParser:
         default=None,
         help="operator-declared effective capabilities; the converter does not inspect runtime policy",
     )
+    convert.add_argument(
+        "--codex-no-capabilities",
+        action="store_true",
+        help="explicitly declare that the enforced Codex target has no tool capabilities",
+    )
     convert.add_argument("--codex-filesystem", choices=[item.value for item in FilesystemAccess], required=True)
     convert.add_argument("--codex-shell", choices=[item.value for item in ShellAccess], required=True)
     convert.add_argument("--codex-network", choices=[item.value for item in NetworkAccess], required=True)
     convert.add_argument("--codex-delegation", choices=[item.value for item in DelegationAccess], required=True)
+    convert.add_argument(
+        "--codex-workspace-scope",
+        help="explicit workspace path scope enforced by the Codex target context",
+    )
     convert.add_argument(
         "--codex-profile-name",
         type=_validate_profile_name,
@@ -61,43 +79,72 @@ def _schema(_: argparse.Namespace) -> int:
 def _convert(args: argparse.Namespace) -> int:
     try:
         document = args.source.read_text(encoding="utf-8")
-        parsed = SOURCES[args.source_harness].parse(document)
+        parsed = parse_source(
+            args.source_harness,
+            document,
+            agent_relative_path=args.source_agent_path,
+        )
+        opencode_context = None
+        if args.opencode_context is not None:
+            from agent_ir.adapters.opencode_v2 import OpenCodeSourceContext
+
+            opencode_context = OpenCodeSourceContext.model_validate_json(
+                args.opencode_context.read_text(encoding="utf-8")
+            )
+        parsed = apply_source_context(parsed, opencode_context)
+        if args.codex_no_capabilities and args.codex_capability is not None:
+            raise ValueError("--codex-no-capabilities cannot be combined with --codex-capability")
         context = CodexTargetContext(
-            enforced_capabilities=args.codex_capability,
+            enforced_capabilities=[] if args.codex_no_capabilities else args.codex_capability,
             filesystem=FilesystemAccess(args.codex_filesystem),
             shell=ShellAccess(args.codex_shell),
             network=NetworkAccess(args.codex_network),
             delegation=DelegationAccess(args.codex_delegation),
-            workspace_scope="workspace",
+            workspace_scope=args.codex_workspace_scope,
         )
         result = CodexAdapter().render(parsed.agent, context)
     except (OSError, UnicodeError, ValueError, ValidationError) as exc:
         print(json.dumps({"error": str(exc)}), file=sys.stderr)
         return 2
 
+    scope_diagnostics = validate_source_target_scope(parsed, context)
+    diagnostics = [*parsed.diagnostics, *scope_diagnostics, *result.diagnostics]
+    parse_blocks = any(item.blocks_emission for item in [*parsed.diagnostics, *scope_diagnostics])
+    emitted = result.emitted and not parse_blocks
+    source_context_state = (
+        "operator-declared; not independently verified by the converter"
+        if any(item.code == "opencode.source_context_unverified" for item in parsed.diagnostics)
+        else "derived from agent rules"
+        if any(item.code == "opencode.source_authority_derived" for item in parsed.diagnostics)
+        else "unknown"
+        if args.source_harness == "opencode-v2"
+        else "not applicable"
+    )
     report = {
         "source": args.source.as_posix(),
         "target": args.target_harness,
-        "emitted": result.emitted,
+        "emitted": emitted,
         "codex_boundary_input": (
             "operator-declared; not independently verified by the converter"
-            if args.codex_capability is not None
+            if args.codex_capability is not None or args.codex_no_capabilities
             else "not supplied"
         ),
-        "diagnostics": [diagnostic.model_dump(mode="json") for diagnostic in [*parsed.diagnostics, *result.diagnostics]],
+        "diagnostics": [diagnostic.model_dump(mode="json") for diagnostic in diagnostics],
         "codex_profile_recommendation": _profile_recommendation(
             parsed.agent,
             args.codex_profile_name,
         ),
     }
-    if result.target_text is not None and args.output is not None:
+    if args.source_harness == "opencode-v2":
+        report["opencode_source_boundary_input"] = source_context_state
+    if emitted and result.target_text is not None and args.output is not None:
         args.output.parent.mkdir(parents=True, exist_ok=True)
         args.output.write_text(result.target_text, encoding="utf-8")
         report["output"] = args.output.as_posix()
-    elif result.target_text is not None:
+    elif emitted and result.target_text is not None:
         report["target_text"] = result.target_text
     print(json.dumps(report, indent=2))
-    return 0 if result.emitted else 2
+    return 0 if emitted else 2
 
 
 def _validate_profile_name(value: str) -> str:

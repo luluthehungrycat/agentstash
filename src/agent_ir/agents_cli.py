@@ -13,10 +13,11 @@ import tempfile
 from pydantic import ValidationError
 
 from agent_ir.adapters.codex import CodexAdapter
+from agent_ir.adapters.opencode_v2 import OpenCodeSourceContext
 from agent_ir.distribution import LocalDistribution
 from agent_ir.github_distributions import RemoteSourceInfo, resolve_github_distribution
 from agent_ir.models import CodexTargetContext
-from agent_ir.registry import SOURCES
+from agent_ir.registry import apply_source_context, parse_source, validate_source_target_scope
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -39,6 +40,11 @@ def _parser() -> argparse.ArgumentParser:
     add.add_argument("--scope", choices=["project", "user"], required=True)
     add.add_argument("--project-root", type=Path, default=Path.cwd())
     add.add_argument("--codex-context", type=Path, required=True)
+    add.add_argument(
+        "--opencode-context",
+        type=Path,
+        help="operator-declared OpenCode effective_capabilities JSON when agent rules do not prove a ceiling",
+    )
     add.add_argument("--dry-run", action="store_true")
     add.add_argument("--force", action="store_true")
     add.set_defaults(handler=_add)
@@ -48,7 +54,11 @@ def _parser() -> argparse.ArgumentParser:
 def _load_profile(distribution_path: str, agent_id: str):
     distribution, remote_source = _resolve_distribution(distribution_path)
     item = distribution.get_agent(agent_id)
-    parsed = SOURCES[item.source.harness].parse(distribution.read_source(item))
+    parsed = parse_source(
+        item.source.harness,
+        distribution.read_source(item),
+        agent_relative_path=item.source.agent_relative_path,
+    )
     return distribution, item, parsed, remote_source
 
 
@@ -70,6 +80,7 @@ def _list(args: argparse.Namespace) -> int:
                 "id": item.id,
                 "harness": item.source.harness,
                 "path": item.source.path,
+                **({"agent_relative_path": item.source.agent_relative_path} if item.source.agent_relative_path else {}),
             }
             for item in distribution.manifest.agents
         ]
@@ -96,7 +107,11 @@ def _inspect(args: argparse.Namespace) -> int:
     report = {
         "distribution": distribution.manifest.name,
         "id": item.id,
-        "source": {"harness": item.source.harness, "path": item.source.path},
+        "source": {
+            "harness": item.source.harness,
+            "path": item.source.path,
+            **({"agent_relative_path": item.source.agent_relative_path} if item.source.agent_relative_path else {}),
+        },
         "agent": {"name": agent.name, "description": agent.description},
         "capabilities": {
             "tool_policy_mode": capabilities.tool_policy_mode.value,
@@ -115,6 +130,17 @@ def _inspect(args: argparse.Namespace) -> int:
         },
         "diagnostics": [diagnostic.model_dump(mode="json") for diagnostic in parsed.diagnostics],
     }
+    if agent.metadata.harness == "opencode-v2":
+        report["opencode"] = {
+            "mode": agent.metadata.original_frontmatter.get("mode", "primary"),
+            "model": agent.model.model_dump(mode="json"),
+            "permissions": agent.metadata.original_frontmatter.get("permissions"),
+            "effective_authority": (
+                "derived from agent rules"
+                if any(item.code == "opencode.source_authority_derived" for item in parsed.diagnostics)
+                else "unknown or inherited"
+            ),
+        }
     if remote_source is not None:
         report["remote_source"] = remote_source.as_json()
     _print(report)
@@ -124,30 +150,54 @@ def _inspect(args: argparse.Namespace) -> int:
 def _add(args: argparse.Namespace) -> int:
     try:
         distribution, item, parsed, remote_source = _load_profile(args.distribution, args.agent_id)
+        opencode_context = None
+        if args.opencode_context is not None:
+            opencode_context = OpenCodeSourceContext.model_validate_json(
+                args.opencode_context.read_text(encoding="utf-8")
+            )
+        parsed = apply_source_context(parsed, opencode_context)
         context_text = args.codex_context.read_text(encoding="utf-8")
         context = CodexTargetContext.model_validate_json(context_text)
         result = CodexAdapter().render(parsed.agent, context)
+        scope_diagnostics = validate_source_target_scope(parsed, context)
         destination = _destination(args.scope, args.project_root, parsed.agent.name)
         _validate_destination(args.scope, args.project_root, destination)
     except (OSError, UnicodeError, ValueError, ValidationError) as exc:
         return _error(exc)
 
-    diagnostics = [diagnostic.model_dump(mode="json") for diagnostic in [*parsed.diagnostics, *result.diagnostics]]
+    diagnostics = [
+        diagnostic.model_dump(mode="json")
+        for diagnostic in [*parsed.diagnostics, *scope_diagnostics, *result.diagnostics]
+    ]
+    parse_blocks = any(item.blocks_emission for item in [*parsed.diagnostics, *scope_diagnostics])
+    emitted = result.emitted and not parse_blocks
     report = {
         "distribution": distribution.manifest.name,
         "agent_id": item.id,
-        "source": {"harness": item.source.harness, "path": item.source.path},
+        "source": {
+            "harness": item.source.harness,
+            "path": item.source.path,
+            **({"agent_relative_path": item.source.agent_relative_path} if item.source.agent_relative_path else {}),
+        },
         "target": args.to,
         "scope": args.scope,
         "destination": destination.as_posix(),
         "codex_boundary_input": "operator-declared; not independently verified by this CLI",
-        "emitted": result.emitted,
+        "emitted": emitted,
         "dry_run": args.dry_run,
         "diagnostics": diagnostics,
     }
+    if item.source.harness == "opencode-v2":
+        report["opencode_source_boundary_input"] = (
+            "operator-declared; not independently verified by this CLI"
+            if any(d.code == "opencode.source_context_unverified" for d in parsed.diagnostics)
+            else "derived from agent rules"
+            if any(d.code == "opencode.source_authority_derived" for d in parsed.diagnostics)
+            else "unknown"
+        )
     if remote_source is not None:
         report["remote_source"] = remote_source.as_json()
-    if not result.emitted:
+    if not emitted:
         _print(report)
         return 2
     if (destination.exists() or destination.is_symlink()) and not args.force:
