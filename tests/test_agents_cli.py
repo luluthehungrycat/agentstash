@@ -22,14 +22,14 @@ CONTEXT = {
 }
 
 
-def test_pyproject_exposes_agentstash_and_compatibility_commands() -> None:
+def test_pyproject_exposes_profileferry_and_compatibility_commands() -> None:
     project_file = Path(__file__).parents[1] / "pyproject.toml"
     project = tomllib.loads(project_file.read_text(encoding="utf-8"))
 
-    assert project["project"]["name"] == "agentstash"
+    assert project["project"]["name"] == "profileferry"
     assert project["project"]["scripts"] == {
         "agent-ir": "agent_ir.cli:main",
-        "agentstash": "agent_ir.agents_cli:main",
+        "profileferry": "agent_ir.agents_cli:main",
         "agents": "agent_ir.agents_cli:main",
     }
 
@@ -223,13 +223,13 @@ def test_remote_add_cannot_bypass_codex_authority_gate(monkeypatch, capsys, tmp_
 
 
 def test_opencode_list_inspect_and_add_keep_path_identity_separate(monkeypatch, capsys, tmp_path: Path) -> None:
-    monkeypatch.setattr("sys.argv", ["agentstash", "list", str(OPENCODE_FIXTURE)])
+    monkeypatch.setattr("sys.argv", ["profileferry", "list", str(OPENCODE_FIXTURE)])
     assert main() == 0
     listing = json.loads(capsys.readouterr().out)
     assert listing["agents"][0]["path"] == "agents/reviewer.md"
     assert listing["agents"][0]["agent_relative_path"] == "reviewer.md"
 
-    monkeypatch.setattr("sys.argv", ["agentstash", "inspect", str(OPENCODE_FIXTURE), "read-only-reviewer"])
+    monkeypatch.setattr("sys.argv", ["profileferry", "inspect", str(OPENCODE_FIXTURE), "read-only-reviewer"])
     assert main() == 0
     inspected = json.loads(capsys.readouterr().out)
     assert inspected["agent"]["name"] == "reviewer"
@@ -249,7 +249,7 @@ def test_opencode_list_inspect_and_add_keep_path_identity_separate(monkeypatch, 
         "network": "none", "delegation": "none", "workspace_scope": "workspace",
     }}), encoding="utf-8")
     argv = [
-        "agentstash", "add", str(OPENCODE_FIXTURE), "read-only-reviewer", "--to", "codex", "--scope", "project",
+        "profileferry", "add", str(OPENCODE_FIXTURE), "read-only-reviewer", "--to", "codex", "--scope", "project",
         "--project-root", str(project), "--codex-context", str(codex_context),
         "--opencode-context", str(opencode_context), "--dry-run",
     ]
@@ -281,7 +281,7 @@ def test_nested_opencode_identity_refuses_install_without_flattening(tmp_path: P
     project.mkdir()
     monkeypatch.setattr(
         "sys.argv",
-        ["agentstash", "add", str(distribution_path), "read-only-reviewer", "--to", "codex", "--scope", "project",
+        ["profileferry", "add", str(distribution_path), "read-only-reviewer", "--to", "codex", "--scope", "project",
          "--project-root", str(project), "--codex-context", str(_context(tmp_path, {
              "enforced_capabilities": [], "filesystem": "none", "shell": "none",
              "network": "none", "delegation": "none", "workspace_scope": None,
@@ -307,7 +307,7 @@ def test_opencode_missing_context_blocks_add_without_destination(tmp_path: Path,
     codex_context = _context(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["agentstash", "add", str(distribution_path), "read-only-reviewer", "--to", "codex", "--scope", "project",
+        ["profileferry", "add", str(distribution_path), "read-only-reviewer", "--to", "codex", "--scope", "project",
          "--project-root", str(project), "--codex-context", str(codex_context)],
     )
 
@@ -328,13 +328,13 @@ def test_remote_opencode_inspect_and_add_keep_path_identity(monkeypatch, capsys,
     )
     monkeypatch.setattr("agent_ir.agents_cli.resolve_github_distribution", lambda locator: resolved)
     locator = "github:example/opencode-agents@main"
-    monkeypatch.setattr("sys.argv", ["agentstash", "list", locator])
+    monkeypatch.setattr("sys.argv", ["profileferry", "list", locator])
     assert main() == 0
     listing = json.loads(capsys.readouterr().out)
     assert listing["agents"][0]["agent_relative_path"] == "reviewer.md"
     assert listing["remote_source"]["commit_sha"] == resolved.source.commit_sha
 
-    monkeypatch.setattr("sys.argv", ["agentstash", "inspect", locator, "read-only-reviewer"])
+    monkeypatch.setattr("sys.argv", ["profileferry", "inspect", locator, "read-only-reviewer"])
     assert main() == 0
     inspected = json.loads(capsys.readouterr().out)
     assert inspected["source"]["agent_relative_path"] == "reviewer.md"
@@ -355,7 +355,7 @@ def test_remote_opencode_inspect_and_add_keep_path_identity(monkeypatch, capsys,
     }}), encoding="utf-8")
     monkeypatch.setattr(
         "sys.argv",
-        ["agentstash", "add", locator, "read-only-reviewer", "--to", "codex", "--scope", "project",
+        ["profileferry", "add", locator, "read-only-reviewer", "--to", "codex", "--scope", "project",
          "--project-root", str(project), "--codex-context", str(codex_context),
          "--opencode-context", str(opencode_context), "--dry-run"],
     )
@@ -368,7 +368,7 @@ def test_remote_opencode_inspect_and_add_keep_path_identity(monkeypatch, capsys,
 
     monkeypatch.setattr(
         "sys.argv",
-        ["agentstash", "add", locator, "read-only-reviewer", "--to", "codex", "--scope", "project",
+        ["profileferry", "add", locator, "read-only-reviewer", "--to", "codex", "--scope", "project",
          "--project-root", str(project), "--codex-context", str(codex_context)],
     )
     assert main() == 2

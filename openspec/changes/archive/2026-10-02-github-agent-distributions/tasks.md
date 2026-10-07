@@ -10,7 +10,7 @@
 - [x] 2.1 Route existing `agents list`, `inspect`, and `add` operations through local or GitHub distribution resolution.
 - [x] 2.2 Report the remote locator, requested ref, resolved SHA, and cache state while preserving existing safety diagnostics.
 - [x] 2.3 Document remote syntax, public-only access, cache configuration, pin semantics, and unsupported repository features.
-- [x] 2.4 Adopt the `agentstash` distribution and primary command name, preserving `agents` and `agent-ir` entry points.
+- [x] 2.4 Adopt the `profileferry` distribution and primary command name, preserving `agents` and `agent-ir` entry points.
 - [x] 2.5 Add a GitHub release workflow for PyPI Trusted Publishing with an isolated OIDC publish job.
 
 ## 3. Verification

@@ -3,7 +3,7 @@ requires = ["hatchling>=1.26"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agentstash"
+name = "profileferry"
 version = "0.1.0"
 description = "Agent distribution CLI and internal intermediate representation for portable custom agents"
 readme = "README.md"
@@ -19,7 +19,7 @@ dev = ["pytest>=8,<9", "mypy>=1.13,<2", "types-PyYAML>=6.0.12,<7"]
 
 [project.scripts]
 agent-ir = "agent_ir.cli:main"
-agentstash = "agent_ir.agents_cli:main"
+profileferry = "agent_ir.agents_cli:main"
 agents = "agent_ir.agents_cli:main"
 
 [tool.hatch.build.targets.wheel]

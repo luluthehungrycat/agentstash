@@ -45,7 +45,7 @@ The system SHALL extract a GitHub archive into a unique staging directory and SH
 - **THEN** processing stops with a clear error and no cache entry is promoted
 
 ### Requirement: Cache by immutable GitHub identity
-The system SHALL cache remote distributions by owner, repository, and resolved commit SHA beneath the configured cache root. The system SHALL prefer `AGENTSTASH_CACHE_DIR`, accept `AGENT_IR_CACHE_DIR` as a compatibility setting, and otherwise use the `agentstash/distributions` directory under the XDG cache root or the user's cache directory. Cache hits SHALL be revalidated with the local manifest and source-path checks, and existing cache entries SHALL NOT be overwritten.
+The system SHALL cache remote distributions by owner, repository, and resolved commit SHA beneath the configured cache root. The system SHALL prefer `PROFILEFERRY_CACHE_DIR`, accept `AGENT_IR_CACHE_DIR` as a compatibility setting, and otherwise use the `profileferry/distributions` directory under the XDG cache root or the user's cache directory. Cache hits SHALL be revalidated with the local manifest and source-path checks, and existing cache entries SHALL NOT be overwritten.
 
 #### Scenario: Reuse an existing cache entry
 - **WHEN** a valid cache entry exists for the resolved commit

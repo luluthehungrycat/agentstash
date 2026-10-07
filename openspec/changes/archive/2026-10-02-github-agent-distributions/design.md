@@ -1,6 +1,6 @@
 ## Context
 
-The `agentstash` CLI accepts a local directory and safely validates its `agents.yaml` before reading selected Claude Code Markdown. This change adds a GitHub transport layer while keeping local manifest validation, source adapters, Agent IR, and target rendering as-is.
+The `profileferry` CLI accepts a local directory and safely validates its `agents.yaml` before reading selected Claude Code Markdown. This change adds a GitHub transport layer while keeping local manifest validation, source adapters, Agent IR, and target rendering as-is.
 
 The remote path is security-sensitive: repositories are untrusted input, the reference may be mutable, archive extraction can escape a cache directory, and a redirect can change the network destination.
 
@@ -29,7 +29,7 @@ Alternatives considered: requiring users to supply full SHAs is maximally reprod
 
 ### Cache location and promotion
 
-Use `AGENTSTASH_CACHE_DIR` when set, falling back to the legacy `AGENT_IR_CACHE_DIR`; otherwise use `$XDG_CACHE_HOME/agentstash/distributions` or `~/.cache/agentstash/distributions`. Cache entries live under `github/OWNER/REPO/SHA`. Download and extract into a unique temporary directory below the cache root, validate the manifest, then atomically rename the completed tree into its immutable cache location. Never overwrite an existing cache entry. A cache hit is still validated by the current strict local distribution reader.
+Use `PROFILEFERRY_CACHE_DIR` when set, falling back to the legacy `AGENT_IR_CACHE_DIR`; otherwise use `$XDG_CACHE_HOME/profileferry/distributions` or `~/.cache/profileferry/distributions`. Cache entries live under `github/OWNER/REPO/SHA`. Download and extract into a unique temporary directory below the cache root, validate the manifest, then atomically rename the completed tree into its immutable cache location. Never overwrite an existing cache entry. A cache hit is still validated by the current strict local distribution reader.
 
 ### Bounded HTTPS and archive extraction
 
@@ -43,7 +43,7 @@ Change the distribution positional argument from a filesystem-only `Path` to a s
 
 ### Package and command identity
 
-Name the Python distribution `agentstash` and expose the matching `agentstash` console script so `uvx agentstash ...` can infer both the distribution and command name. Keep `agents` as a compatibility alias for the distribution CLI and keep `agent-ir` for IR conversion/schema commands. The import package remains `agent_ir`. Add a GitHub release workflow using PyPI Trusted Publishing; the workflow builds and tests without OIDC permission, then publishes only downloaded artifacts from a separate job. This change configures but does not trigger a PyPI release.
+Name the Python distribution `profileferry` and expose the matching `profileferry` console script so `uvx profileferry ...` can infer both the distribution and command name. Keep `agents` as a compatibility alias for the distribution CLI and keep `agent-ir` for IR conversion/schema commands. The import package remains `agent_ir`. Add a GitHub release workflow using PyPI Trusted Publishing; the workflow builds and tests without OIDC permission, then publishes only downloaded artifacts from a separate job. This change configures but does not trigger a PyPI release.
 
 ## Risks / Trade-offs
 

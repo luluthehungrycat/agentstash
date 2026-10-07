@@ -1,4 +1,4 @@
-# Agent IR and AgentStash
+# Agent IR and Profile Ferry
 
 An experimental, internal Python package for converting custom agent definitions through a typed intermediate representation. It is not a proposed universal agent specification.
 
@@ -27,7 +27,7 @@ The JSON report includes an advisory profile template based on the source filesy
 
 ## Local agent distributions
 
-The `agentstash` command can list, inspect, preview, and install an agent from a local or public GitHub distribution. The `agents` command remains as a compatibility alias. A distribution has an `agents.yaml` manifest with stable IDs and relative source paths. It accepts Claude Code or OpenCode V2 Markdown sources and installs Codex standalone agent TOML files:
+The `profileferry` command can list, inspect, preview, and install an agent from a local or public GitHub distribution. The `agents` command remains as a compatibility alias. A distribution has an `agents.yaml` manifest with stable IDs and relative source paths. It accepts Claude Code or OpenCode V2 Markdown sources and installs Codex standalone agent TOML files:
 
 ```yaml
 schema_version: 1
@@ -42,14 +42,14 @@ agents:
 ```
 
 ```sh
-agentstash list ./my-agents
-agentstash inspect ./my-agents security-auditor
-agentstash add ./my-agents security-auditor --to codex --scope project \
+profileferry list ./my-agents
+profileferry inspect ./my-agents security-auditor
+profileferry add ./my-agents security-auditor --to codex --scope project \
   --codex-context ./codex-context.json --dry-run
-agentstash add ./my-agents security-auditor --to codex --scope project \
+profileferry add ./my-agents security-auditor --to codex --scope project \
   --codex-context ./codex-context.json
-agentstash list github:OWNER/REPO@main
-agentstash add github:OWNER/REPO@main security-auditor --to codex --scope user \
+profileferry list github:OWNER/REPO@main
+profileferry add github:OWNER/REPO@main security-auditor --to codex --scope user \
   --codex-context ./codex-context.json --dry-run
 ```
 
@@ -99,7 +99,7 @@ agent-ir convert path/to/zero-authority.md --from opencode-v2 \
   --output /tmp/reviewer.toml
 ```
 
-The package is named `agentstash` and provides the matching command, so once it is published the CLI can run ephemerally as `uvx agentstash <command>`. It is not published to PyPI yet. For development, use `uv run agentstash <command>`.
+The package is named `profileferry` and provides the matching command, so once it is published the CLI can run ephemerally as `uvx profileferry <command>`. It is not published to PyPI yet. For development, use `uv run profileferry <command>`.
 
 The context JSON must validate as `CodexTargetContext` and describe the effective Codex capability boundary enforced outside the generated agent file. The CLI cannot verify that policy; it labels this input as operator-declared and unverified. The Codex renderer blocks output when it cannot prove that the effective target is no broader than the source. Project installs go to `.codex/agents/`; user installs go to `$CODEX_HOME/agents/` or `~/.codex/agents/`. Existing files are preserved unless `--force` is supplied. Local distribution files are treated as data: commands do not execute scripts, import modules, install dependencies, or access the network.
 
@@ -120,10 +120,10 @@ For example, an operator who has verified these effective limits can supply:
 }
 ```
 
-GitHub distribution locators use `github:OWNER/REPO@REF`. Mutable refs are resolved to a full commit SHA before downloading; CLI output shows the requested ref, resolved SHA, and whether the immutable cache was used. You can pin a full SHA directly. Full-SHA cache hits work offline. Set `AGENTSTASH_CACHE_DIR` to change the cache location; the legacy `AGENT_IR_CACHE_DIR` setting remains supported. By default the cache uses `$XDG_CACHE_HOME/agentstash/distributions` or `~/.cache/agentstash/distributions`.
+GitHub distribution locators use `github:OWNER/REPO@REF`. Mutable refs are resolved to a full commit SHA before downloading; CLI output shows the requested ref, resolved SHA, and whether the immutable cache was used. You can pin a full SHA directly. Full-SHA cache hits work offline. Set `PROFILEFERRY_CACHE_DIR` to change the cache location; the legacy `AGENT_IR_CACHE_DIR` setting remains supported. By default the cache uses `$XDG_CACHE_HOME/profileferry/distributions` or `~/.cache/profileferry/distributions`.
 
 Remote support currently accepts public GitHub repositories only and does not use credentials. Archives are size-limited and extracted as data; traversal, symlinks, hard links, special files, and ambiguous paths are rejected. This protects extraction and repeatability, but a commit pin does not establish that an upstream agent is trustworthy. Private repositories, other Git hosts, submodules, automatic updates, and cache cleanup commands are not supported yet.
 
 ## Publishing
 
-The package is configured for PyPI Trusted Publishing from GitHub Actions. The release workflow builds and checks the package in one job, then publishes only the built artifacts in a separate OIDC-enabled job using the GitHub `pypi` environment. No PyPI token is stored in repository secrets. To publish a release, first merge the workflow to the default branch, configure a PyPI Trusted Publisher for `luluthehungrycat/agentstash` with workflow `.github/workflows/publish.yml` and environment `pypi`, then publish a GitHub Release. The first PyPI upload has not been made yet.
+The package is configured for PyPI Trusted Publishing from GitHub Actions. The release workflow builds and checks the package in one job, then publishes only the built artifacts in a separate OIDC-enabled job using the GitHub `pypi` environment. No PyPI token is stored in repository secrets. To publish a release, first merge the workflow to the default branch, configure a PyPI Trusted Publisher for `luluthehungrycat/profileferry` with workflow `.github/workflows/publish.yml` and environment `pypi`, then publish a GitHub Release. The first PyPI upload has not been made yet.

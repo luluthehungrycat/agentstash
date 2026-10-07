@@ -125,12 +125,12 @@ def parse_github_locator(value: str) -> GitHubLocator:
 
 
 def default_cache_dir() -> Path:
-    configured = os.environ.get("AGENTSTASH_CACHE_DIR") or os.environ.get("AGENT_IR_CACHE_DIR")
+    configured = os.environ.get("PROFILEFERRY_CACHE_DIR") or os.environ.get("AGENT_IR_CACHE_DIR")
     if configured:
         return Path(configured).expanduser()
     xdg_cache = os.environ.get("XDG_CACHE_HOME")
     base = Path(xdg_cache).expanduser() if xdg_cache else Path.home() / ".cache"
-    return base / "agentstash" / "distributions"
+    return base / "profileferry" / "distributions"
 
 
 def _read_limited(stream: BinaryIO, max_bytes: int) -> bytes:
@@ -153,7 +153,7 @@ def _request_bytes(url: str, *, max_bytes: int, accept: str) -> bytes:
         url,
         headers={
             "Accept": accept,
-            "User-Agent": "agentstash/0.1.0",
+            "User-Agent": "profileferry/0.1.0",
             "X-GitHub-Api-Version": "2026-03-10",
         },
     )
