@@ -1,6 +1,6 @@
 ## Why
 
-AgentStash currently reads Claude Code Markdown distributions and converts them to Codex. OpenCode V2 also defines reusable agents as Markdown files, but its identity comes from the file path and its ordered permission rules depend on the rest of the active OpenCode configuration. Supporting that source format requires preserving its document and rule semantics while refusing conversions whose effective authority cannot be established.
+Profile Ferry currently reads Claude Code Markdown distributions and converts them to Codex. OpenCode V2 also defines reusable agents as Markdown files, but its identity comes from the file path and its ordered permission rules depend on the rest of the active OpenCode configuration. Supporting that source format requires preserving its document and rule semantics while refusing conversions whose effective authority cannot be established.
 
 ## What Changes
 

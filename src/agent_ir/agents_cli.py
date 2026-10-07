@@ -21,7 +21,7 @@ from agent_ir.registry import apply_source_context, parse_source, validate_sourc
 
 
 def _parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(prog="agentstash")
+    parser = argparse.ArgumentParser(prog="profileferry")
     commands = parser.add_subparsers(dest="command", required=True)
 
     list_command = commands.add_parser("list", help="list agents in a local distribution")

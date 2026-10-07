@@ -102,21 +102,21 @@ def test_read_limited_caps_stream_bytes() -> None:
         github._read_limited(BytesIO(b"123456"), 5)
 
 
-def test_agentstash_cache_location_prefers_new_env_and_keeps_legacy_compatibility(
+def test_profileferry_cache_location_prefers_new_env_and_keeps_legacy_compatibility(
     monkeypatch,
     tmp_path: Path,
 ) -> None:
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "xdg"))
     monkeypatch.setenv("AGENT_IR_CACHE_DIR", str(tmp_path / "legacy"))
-    monkeypatch.delenv("AGENTSTASH_CACHE_DIR", raising=False)
+    monkeypatch.delenv("PROFILEFERRY_CACHE_DIR", raising=False)
     assert github.default_cache_dir() == tmp_path / "legacy"
 
-    monkeypatch.setenv("AGENTSTASH_CACHE_DIR", str(tmp_path / "new"))
+    monkeypatch.setenv("PROFILEFERRY_CACHE_DIR", str(tmp_path / "new"))
     assert github.default_cache_dir() == tmp_path / "new"
 
-    monkeypatch.delenv("AGENTSTASH_CACHE_DIR")
+    monkeypatch.delenv("PROFILEFERRY_CACHE_DIR")
     monkeypatch.delenv("AGENT_IR_CACHE_DIR")
-    assert github.default_cache_dir() == tmp_path / "xdg" / "agentstash" / "distributions"
+    assert github.default_cache_dir() == tmp_path / "xdg" / "profileferry" / "distributions"
 
 
 def test_github_http_reader_enforces_body_caps_and_timeout(monkeypatch) -> None:

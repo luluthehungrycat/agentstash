@@ -2,7 +2,7 @@
 
 The `agent-ir` repository has a validated IR and a Claude Code → Codex converter, but users must currently point the conversion CLI at a single profile and manually handle destination paths. This change adds a versioned distribution manifest and an installer command for local and public GitHub sources. Its implemented conversion path remains Claude Code Markdown → Agent IR → Codex TOML.
 
-The project direction is broader than this slice: AgentStash is intended to support conversions between harnesses through source and target adapters, not to stop at Claude Code and Codex. Future adapters should cover OpenCode, OMP / oh-my-pi, Pi (using an extension if necessary), Mistral Vibe CLI, Hermes Agent, and Claude Code target/round-trip behavior. OpenClaw is a possible later addition. Antigravity and Copilot CLI require capability discovery before deciding whether they can be supported.
+The project direction is broader than this slice: Profile Ferry is intended to support conversions between harnesses through source and target adapters, not to stop at Claude Code and Codex. Future adapters should cover OpenCode, OMP / oh-my-pi, Pi (using an extension if necessary), Mistral Vibe CLI, Hermes Agent, and Claude Code target/round-trip behavior. OpenClaw is a possible later addition. Antigravity and Copilot CLI require capability discovery before deciding whether they can be supported.
 
 Adapters own semantic mappings and diagnostics. If a target lacks a source primitive, an adapter may select another target control only when it safely preserves or narrows effective authority. It should report omitted functionality; if the adapter cannot establish a safe capability subset, it must block runnable output. Additional harnesses require verification against real harness behavior before they are treated as supported.
 
@@ -35,7 +35,7 @@ An explicit manifest is preferred over recursively treating every Markdown file 
 
 ### CLI separates read-only commands from writes
 
-Expose the primary `agentstash` console command alongside the existing `agent-ir` command; retain `agents` as a compatibility alias:
+Expose the primary `profileferry` console command alongside the existing `agent-ir` command; retain `agents` as a compatibility alias:
 
 - `agents list <distribution>` validates the manifest and lists stable IDs/names.
 - `agents inspect <distribution> <id>` parses the source and reports its identity, source harness, and semantic capability summary without writing.
@@ -69,4 +69,4 @@ No existing config or installed files are migrated. Add the console script and m
 
 - Future harness adapters need verified mappings for each harness's tools, permissions, model controls, delegation, isolation, and lifecycle semantics.
 - Antigravity and Copilot CLI first need research into whether they expose custom-agent or subagent definitions.
-- The package and primary CLI are named `agentstash`; `agents` and `agent-ir` remain available for compatibility. The release workflow uses PyPI Trusted Publishing, but the first package release has not been published.
+- The package and primary CLI are named `profileferry`; `agents` and `agent-ir` remain available for compatibility. The release workflow uses PyPI Trusted Publishing, but the first package release has not been published.

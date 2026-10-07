@@ -13,4 +13,4 @@ The system SHALL accept `harness: opencode-v2` entries that reference V2 Markdow
 
 #### Scenario: Require source context for Codex add
 - **WHEN** a selected OpenCode source has ambiguous effective authority and the user has not supplied the required OpenCode source context
-- **THEN** `agentstash add` blocks conversion and writes no destination
+- **THEN** `profileferry add` blocks conversion and writes no destination

@@ -1,7 +1,7 @@
 # OpenCode V2 Agent Sources Specification
 
 ## Purpose
-Define how AgentStash reads and safely converts OpenCode V2 Markdown agent files through Agent IR.
+Define how Profile Ferry reads and safely converts OpenCode V2 Markdown agent files through Agent IR.
 
 ## ADDED Requirements
 ### Requirement: Parse V2 Markdown with path-derived identity

@@ -1,18 +1,18 @@
 ## Why
 
-Agent IR currently provides a Claude Code Markdown → Agent IR → Codex TOML conversion path, but it has no distribution format or installer flow for discovering and selecting reusable agents. AgentStash adds that workflow while retaining conversion diagnostics and safe permission checks. Its distribution sources can be local or public GitHub repositories.
+Agent IR currently provides a Claude Code Markdown → Agent IR → Codex TOML conversion path, but it has no distribution format or installer flow for discovering and selecting reusable agents. Profile Ferry adds that workflow while retaining conversion diagnostics and safe permission checks. Its distribution sources can be local or public GitHub repositories.
 
 ## What Changes
 
 - Define and validate a versioned `agents.yaml` manifest for a local or public GitHub agent distribution and its relative source profile paths.
-- Add `agentstash list`, `agentstash inspect`, and `agentstash add` commands for manifest-backed local and public GitHub distributions, retaining `agents` as a compatibility command.
+- Add `profileferry list`, `profileferry inspect`, and `profileferry add` commands for manifest-backed local and public GitHub distributions, retaining `agents` as a compatibility command.
 - Implement Claude Code Markdown as the source and Codex as the first target, with project and user scopes, conversion diagnostics, safe capability checks, no-overwrite behavior by default, and an explicit preview mode.
 - Add a GitHub release workflow that builds and checks distributions before a Trusted Publishing (OIDC) job; publishing an actual release remains a separate operation.
 - Keep additional harness adapters, same-harness round trips, and automatic discovery from arbitrary directories outside this implementation slice.
 
 ## Longer-Term Conversion Direction
 
-AgentStash is intended to convert supported custom agents and subagents between harnesses through Agent IR, in either direction where source and target adapters exist. The current Claude Code → IR → Codex path is the first vertical slice, not a limit on the product's harness scope.
+Profile Ferry is intended to convert supported custom agents and subagents between harnesses through Agent IR, in either direction where source and target adapters exist. The current Claude Code → IR → Codex path is the first vertical slice, not a limit on the product's harness scope.
 
 Planned adapter research and development includes OpenCode, OMP / oh-my-pi, Pi (including an extension when required), Mistral Vibe CLI, and Hermes Agent. Claude Code target rendering and same-harness round trips should also be considered as adapters mature. OpenClaw is a possible later harness. Antigravity and Copilot CLI need capability discovery first; support depends on whether they provide usable custom-agent or subagent primitives.
 
