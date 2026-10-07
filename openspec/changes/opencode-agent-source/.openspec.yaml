@@ -1,0 +1,4 @@
+schema: spec-driven
+created: 2026-10-02
+goal: Specify support for OpenCode V2 Markdown source agents through the
+  existing Agent IR and Codex renderer

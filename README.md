@@ -2,7 +2,7 @@
 
 An experimental, internal Python package for converting custom agent definitions through a typed intermediate representation. It is not a proposed universal agent specification.
 
-This first slice implements a Claude Code Markdown source adapter and a Codex custom-agent TOML target adapter. The adapters preserve prompt and source metadata, and conversion diagnostics distinguish lost functionality from changes to authority.
+This slice implements Claude Code and OpenCode V2 Markdown source adapters and a Codex custom-agent TOML target adapter. The adapters preserve prompt and source metadata, and conversion diagnostics distinguish lost functionality from changes to authority.
 
 See [plan.md](plan.md) for the accepted implementation plan and [docs/architecture.md](docs/architecture.md) for the design.
 
@@ -27,7 +27,7 @@ The JSON report includes an advisory profile template based on the source filesy
 
 ## Local agent distributions
 
-The `agentstash` command can list, inspect, preview, and install an agent from a local or public GitHub distribution. The `agents` command remains as a compatibility alias. A distribution has an `agents.yaml` manifest with stable IDs and relative source paths. The first version accepts Claude Code Markdown sources and installs Codex standalone agent TOML files:
+The `agentstash` command can list, inspect, preview, and install an agent from a local or public GitHub distribution. The `agents` command remains as a compatibility alias. A distribution has an `agents.yaml` manifest with stable IDs and relative source paths. It accepts Claude Code or OpenCode V2 Markdown sources and installs Codex standalone agent TOML files:
 
 ```yaml
 schema_version: 1
@@ -53,9 +53,55 @@ agentstash add github:OWNER/REPO@main security-auditor --to codex --scope user \
   --codex-context ./codex-context.json --dry-run
 ```
 
+OpenCode V2 agent identity comes from the path relative to an OpenCode agents directory, while `source.path` remains the contained file path within the distribution. Manifests therefore require a separate `source.agent_relative_path` for OpenCode entries:
+
+```yaml
+agents:
+  - id: code-reviewer
+    source:
+      harness: opencode-v2
+      path: agents/team/reviewer.md
+      agent_relative_path: team/reviewer.md
+```
+
+Standalone conversion uses `--from opencode-v2 --source-agent-path team/reviewer.md`. The adapter reads V2 Markdown frontmatter and body as data, preserves the original document and ordered permission rules, and retains unknown fields with blocking diagnostics. It supports the documented description, model, mode, and permissions fields, but blocks features Codex cannot preserve, including primary/all modes, disabled agents, step limits, lifecycle behavior, model variants, and resource-specific permission patterns. `hidden: true` emits a non-blocking diagnostic because Codex agent files cannot preserve OpenCode's hidden-listing and subagent-catalog behavior. A nested OpenCode identity is preserved; installation refuses it when it cannot be represented by Codex's safe single-file agent name.
+
+OpenCode's effective permissions can depend on global rules and runtime context. Inspection does not claim that agent-local rules are the complete policy. Conversion therefore requires either a final agent-local `action: "*"`, `resource: "*"`, `effect: deny` rule that establishes zero authority, or an explicit source context supplied with `--opencode-context`. That JSON must contain a complete, strict `effective_capabilities` object using supported OpenCode action names and consistent Agent IR dimensions; it is an operator declaration, not independently verified evidence. Known local denials cannot be overridden by the context. Ask rules, unknown actions, and scoped resource rules remain blockers because a broad declaration cannot prove their narrower semantics.
+
+For example, an operator who has verified that the active OpenCode policy permits only read, glob, and grep within `/workspace` can supply:
+
+```json
+{
+  "effective_capabilities": {
+    "tools": [
+      {"name": "read", "state": "allowed", "semantic_capabilities": ["filesystem.read_content"]},
+      {"name": "glob", "state": "allowed", "semantic_capabilities": ["filesystem.list_paths"]},
+      {"name": "grep", "state": "allowed", "semantic_capabilities": ["filesystem.search_content"]}
+    ],
+    "tool_policy_mode": "allowlist",
+    "filesystem": "read-only",
+    "shell": "none",
+    "network": "none",
+    "delegation": "none",
+    "workspace_scope": "/workspace"
+  }
+}
+```
+
+OpenCode path-scoped filesystem or shell access is emitted only when source and target contexts provide the same explicit `workspace_scope`. For standalone conversions, `--codex-workspace-scope` supplies the target scope. Use `--codex-no-capabilities` to declare an explicitly empty target tool boundary; omitting both it and `--codex-capability` leaves that boundary unknown. OpenCode-derived zero authority can only convert when the Codex context is explicitly no broader. For example, a final catch-all deny can be converted with `--codex-no-capabilities` and all four Codex access dimensions set to `none`.
+
+```sh
+agent-ir convert path/to/zero-authority.md --from opencode-v2 \
+  --source-agent-path reviewer.md \
+  --codex-no-capabilities \
+  --codex-filesystem none --codex-shell none \
+  --codex-network none --codex-delegation none \
+  --output /tmp/reviewer.toml
+```
+
 The package is named `agentstash` and provides the matching command, so once it is published the CLI can run ephemerally as `uvx agentstash <command>`. It is not published to PyPI yet. For development, use `uv run agentstash <command>`.
 
-The context JSON must validate as `CodexTargetContext` and describe the effective Codex capability boundary enforced outside the generated agent file. The CLI cannot verify that policy; it labels this input as operator-declared and unverified. The Codex renderer blocks output when it cannot prove that the effective target is no broader than the Claude source. Project installs go to `.codex/agents/`; user installs go to `$CODEX_HOME/agents/` or `~/.codex/agents/`. Existing files are preserved unless `--force` is supplied. Local distribution files are treated as data: commands do not execute scripts, import modules, install dependencies, or access the network.
+The context JSON must validate as `CodexTargetContext` and describe the effective Codex capability boundary enforced outside the generated agent file. The CLI cannot verify that policy; it labels this input as operator-declared and unverified. The Codex renderer blocks output when it cannot prove that the effective target is no broader than the source. Project installs go to `.codex/agents/`; user installs go to `$CODEX_HOME/agents/` or `~/.codex/agents/`. Existing files are preserved unless `--force` is supplied. Local distribution files are treated as data: commands do not execute scripts, import modules, install dependencies, or access the network.
 
 For example, an operator who has verified these effective limits can supply:
 
