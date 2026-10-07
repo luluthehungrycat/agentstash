@@ -23,7 +23,7 @@
 - [x] 4.1 Define `--opencode-context` for add and standalone conversion as an operator declaration whose `effective_capabilities` uses existing `Capabilities` fields, requires all authority keys, allowlist tool mode and non-unknown grant/dimension values; it may narrow known source rules but cannot override explicit local denials or resolve ambiguous local rules.
 - [x] 4.2 Preserve ordered last-match rules and derive capabilities only for a conservative subset; allow a final local catch-all deny to prove a ceiling without source context, otherwise block missing/inherited/unknown policy, unresolved `ask`, unknown actions, unrepresentable resources, and broader target authority.
 - [x] 4.3 Test safe conversion with a provable restrictive source ceiling and no-broader Codex context; test missing context, default allow, inherited/global ambiguity, `ask`, later overrides, wildcard rules, target broadening, and no-write blocking.
-- [x] 4.4 Verify disabled agents and unsupported model, lifecycle, delegation, or step limits produce the specified diagnostics or block output when behavior cannot be preserved.
+- [x] 4.4 Verify disabled agents and unsupported model, lifecycle, delegation, or step limits produce the specified diagnostics or block output when behavior cannot be preserved; verify `hidden: true` reports its lost visibility behavior.
 
 ## 5. Documentation and Verification
 

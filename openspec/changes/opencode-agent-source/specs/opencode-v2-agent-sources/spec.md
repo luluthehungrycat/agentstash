@@ -19,6 +19,10 @@ The system SHALL accept only OpenCode V2 Markdown agent sources for this harness
 - **WHEN** a V2 source contains fields that Agent IR does not model
 - **THEN** the parser preserves them in source metadata and emits structured fidelity or functionality diagnostics without interpreting V1-only fields as V2 semantics
 
+#### Scenario: Report hidden-agent visibility loss
+- **WHEN** a V2 source sets `hidden: true`
+- **THEN** the parser emits a non-blocking functionality diagnostic explaining that Codex agent files cannot preserve OpenCode's hidden-listing and subagent-catalog behavior
+
 ### Requirement: Preserve ordered OpenCode permission semantics
 The system SHALL retain each V2 permission rule's order, action, resource, and `allow`, `ask`, or `deny` effect. It SHALL evaluate or summarize rules using OpenCode's last-matching-rule behavior and SHALL distinguish agent-local rules from unknown global, default, plugin, and runtime policy.
 

@@ -270,6 +270,15 @@ class OpenCodeV2Adapter:
             ))
         if "hidden" in frontmatter and not isinstance(frontmatter["hidden"], bool):
             raise ValueError("OpenCode V2 `hidden` must be a boolean")
+        if frontmatter.get("hidden", False):
+            diagnostics.append(_diagnostic(
+                "opencode.hidden_not_representable",
+                "hidden",
+                "OpenCode hidden agents are omitted from normal listings and the subagent catalog; Codex agent files have no equivalent visibility setting.",
+                category=DiagnosticCategory.FUNCTIONALITY,
+                status=MappingStatus.DROPPED,
+                blocks=False,
+            ))
         if "color" in frontmatter and not isinstance(frontmatter["color"], str):
             raise ValueError("OpenCode V2 `color` must be a string")
 

@@ -108,6 +108,20 @@ def test_duplicate_frontmatter_key_is_rejected_and_unknown_metadata_is_retained(
     assert any(item.code == "opencode.extension_preserved" and item.blocks_emission for item in parsed.diagnostics)
 
 
+def test_hidden_agent_reports_lost_visibility_behavior() -> None:
+    document = (
+        "---\nmode: subagent\nhidden: true\n"
+        "permissions:\n  - {action: '*', resource: '*', effect: deny}\n---\nHidden prompt.\n"
+    )
+
+    parsed = parse_source("opencode-v2", document, agent_relative_path="hidden.md")
+
+    diagnostic = next(item for item in parsed.diagnostics if item.code == "opencode.hidden_not_representable")
+    assert not diagnostic.blocks_emission
+    result = CodexAdapter().render(parsed.agent, target_context())
+    assert result.emitted
+
+
 def test_missing_permissions_requires_operator_context_and_context_is_labelled_unverified() -> None:
     parsed = parse_source("opencode-v2", read_fixture("no-permissions.md"), agent_relative_path="reader.md")
     assert any(item.blocks_emission for item in parsed.diagnostics)
